@@ -2,7 +2,7 @@
 
 **[English](README.en.md) | [日本語](README.jp.md)**
 
-Copyright 2026 mochimochi-man / うっ ([X: @calorie0](https://x.com/calorie0))
+Copyright 2026 mochimochi-man / うっ [X: @calorie0]
 
 ESP32-S3 と 320x240 の ST7789 パネルで動く海底探索海洋探索アドベンチャーゲームっぽいけどゲームではない何か。
 
