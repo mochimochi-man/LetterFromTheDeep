@@ -2,7 +2,7 @@
 
 **[English](README.en.md) | [日本語](README.jp.md)**
 
-Copyright 2026 mochimochi-man / Uh ([X: @calorie0](https://x.com/calorie0))
+Copyright 2026 mochimochi-man / Uh [X: @calorie0]
 
 An ocean-exploration adventure game — or something that is not quite a game for the ESP32-S3 and a 320x240 ST7789 panel. 
 
