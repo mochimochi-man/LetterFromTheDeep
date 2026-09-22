@@ -1,6 +1,11 @@
 Letter from The Deep
 
 
+1.0.2   2026-09-22
+
+  - Fixed: the map recorded where the pilot had been without being saved.
+
+
 1.0.1   2026-09-22
 
   - Fixed: the seabed's texture stretched when it was approached.

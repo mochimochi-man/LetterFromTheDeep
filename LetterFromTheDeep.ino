@@ -43,8 +43,6 @@ static Pilot pilot;
 static Finale finale;
 static SurveyMap survey;
 static ZoneTitle zoneTitle;
-static bool mapDirty=false;
-static uint32_t lastMapSave=0;
 static float surfaceTourTime=0;
 static PilotInput keyboard;
 static uint32_t keyboardUntil=0;
@@ -184,7 +182,7 @@ static void changeRegion(bool enter) {
     if(!enter) c.lookAt({-12,-12,-30},{-12,-30,4});
     pilot.enter(c);
   }
-  survey.build(scene);lastMapSave=millis()-15001;
+  survey.build(scene);
   keyboard={};keyboardUntil=0;
   Serial.printf("FINALE: %s | static=%d | stack_min_free=%u\n",enter?"CITY ENTERED":"SURFACE RETURN",scene.staticCount,unsigned(uxTaskGetStackHighWaterMark(nullptr)));
 }
@@ -320,8 +318,8 @@ static void saveSpot() {
   auto records=journal.encode();
   if(journalStorage.putBytes("v1",records.data(),records.size())==records.size()) journalDirty=false;
   auto map=survey.encode();
-  if(journalStorage.putBytes("map1",map.data(),map.size())==map.size()) mapDirty=false;
-  lastJournalSave=lastMapSave=millis();
+  journalStorage.putBytes("map1",map.data(),map.size());
+  lastJournalSave=millis();
   Serial.printf("SAVE: %.0f %.0f %.0f%s\n",double(spot[0]),double(spot[1]),double(spot[2]),
     scene.city?" (city)":"");
   // Opening the map is the only save point, and nothing on screen ever said so.
@@ -701,7 +699,7 @@ void loop() {
     else if((titleClock+=dt)>=DemoTitleSeconds) beginDemo();
   } else if(demoMode && canPlay()) endDemo();
   Camera camera=pilot.manual?pilot.camera:scene.tour(tourTime);
-  if(!titleScreen && !demoMode && !finale.cinematic() && survey.visit(camera.position,scene.city)) mapDirty=true;
+  if(!titleScreen && !demoMode && !finale.cinematic()) survey.visit(camera.position,scene.city);
   auto event=(paused || survey.expanded || titleScreen || demoMode || introClock>=0)?Finale::Event::None:finale.update(journal.allMonumentsFound(),camera,dt,pilot.manual);
   if(event==Finale::Event::GateOpens) {
     // No cutscene and no teleport: the picture shakes, one line lands in the middle of
@@ -730,7 +728,7 @@ void loop() {
     camera=pilot.manual?pilot.camera:scene.tour(tourTime);
   } else if(event==Finale::Event::OpenGate && pilot.manual) camera=pilot.camera;
   camera=finale.view(camera);
-  if(!titleScreen && !finale.cinematic() && survey.visit(camera.position,scene.city)) mapDirty=true;
+  if(!titleScreen && !finale.cinematic()) survey.visit(camera.position,scene.city);
   scene.animate(lifeTime,camera);
   uint32_t ts=micros();
   renderer.prepare(scene,camera,lifeTime);
@@ -757,15 +755,14 @@ void loop() {
   }
   // Whatever the opening run passes is recorded, but never announced over it.
   if(introClock>=0) journal.noticeSeconds=0;
-  if(demoMode) { journalDirty=false; mapDirty=false; }
+  if(demoMode) journalDirty=false;
   if(journalDirty && journalStorageReady && millis()-lastJournalSave>1500) {
     auto saved=journal.encode();lastJournalSave=millis();
     if(journalStorage.putBytes("v1",saved.data(),saved.size())==saved.size()) journalDirty=false;
   }
-  if(mapDirty && journalStorageReady && millis()-lastMapSave>15000) {
-    auto saved=survey.encode();lastMapSave=millis();
-    if(journalStorage.putBytes("map1",saved.data(),saved.size())==saved.size()) mapDirty=false;
-  }
+  // What has been found is kept as soon as it is found; where the pilot has been is
+  // not. The map reaches the flash only through saveSpot, which is to say by opening
+  // it - the one save point this game has.
   if(titleScreen) {
     drawTitleScreen();
   } else {
