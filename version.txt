@@ -1,0 +1,12 @@
+Letter from The Deep
+
+
+1.0.1   2026-09-22
+
+  - Fixed: the seabed's texture stretched when it was approached.
+  - Fixed: a school of fish changed its size and heading when it was approached.
+
+
+1.0.0   2026-09-22
+
+  - First release.

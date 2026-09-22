@@ -6,6 +6,9 @@ namespace abyss {
 struct Projected {
   float x[3],y[3];
   // Only vertex 0 travels with the gradients; the other two are consumed while projecting.
+  // u0/v0 and their gradients are u/z and v/z, not u and v: those are the quantities that
+  // run straight across the screen, and the rasteriser divides them back by 1/z as it
+  // goes. Interpolating u and v directly is what makes a surface seen edge-on smear.
   float q0,u0,v0;
   float dqdx,dqdy,dxdy[3];
   float dudx,dudy,dvdx,dvdy;

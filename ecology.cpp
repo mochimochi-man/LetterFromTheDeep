@@ -206,6 +206,14 @@ void Ecosystem::update(const Scene& scene,const Camera& cam,float time) {
   const int cameraZone=world::environment(cam.position.x,cam.position.z).zone;
   if(cameraZone==3)restingCoelacanths(scene,cam,time);
   auto at=[&](int i)->const Habitat& { return i<HabitatCount?habitats[i]:local[i-HabitatCount]; };
+  // What names a habitat. The stored ones are named by their place in the list, which
+  // never moves. The nine made up around the submarine are refilled from a grid that
+  // follows the pilot, so their slot changes every time a cell boundary is crossed - and
+  // everything drawn from that slot changed with it: how many fish are in the school,
+  // which way it faces, whether a predator is working its edge, what colour each fish is.
+  // Naming them by the cell they sit in instead holds all of it still while the pilot
+  // swims up to them. The stored habitats keep the numbers they always had.
+  auto identity=[&](int i) { return i<HabitatCount?i:int(HabitatCount+at(i).seed%4096u); };
   // Nearest visible habitats have priority; no allocation or frame-dependent state.
   // The pool grew with the habitat count: scattered sites must not crowd out the nearby ones.
   constexpr int Pool=20;
@@ -248,7 +256,7 @@ void Ecosystem::update(const Scene& scene,const Camera& cam,float time) {
   };
   int schools=0;
   for(int n=0;n<selectedCount && schools<9;++n) {
-    int index=selected[n]; const auto& h=at(index);
+    const auto& h=at(selected[n]); const int index=identity(selected[n]);
     // Schools sit at varied depths now, so the gate that admits them has to be wider or
     // the ones above and below the submarine never appear.
     // The gate never looked sideways, so a school just off the edge of the screen could
@@ -312,7 +320,7 @@ void Ecosystem::update(const Scene& scene,const Camera& cam,float time) {
   }
   int giants=0;
   for(int n=0;n<selectedCount && n<7;++n) {
-    int index=selected[n]; const auto& h=at(index);
+    const auto& h=at(selected[n]); const int index=identity(selected[n]);
     int population=h.resident==Species::Goby?10:h.resident==Species::Crab?7:4;
     if(h.resident==Species::GardenEel) population=24;
     if(h.resident==Species::Trilobite || h.resident==Species::Opabinia) population=11;

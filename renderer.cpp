@@ -172,7 +172,11 @@ void Renderer::project(Vec3 a,Vec3 b,Vec3 c,const Triangle& triangle,const float
     p.y[j]=Height*0.5f-v[j].y*Focal*iz;
     qv[j]=Near*65534.0f*iz;
   }
-  p.q0=qv[0]; p.u0=u[0]; p.v0=vtex[0];
+  // Texturing is perspective correct, so what travels is u/z and v/z. qv is already
+  // proportional to 1/z, so multiplying by it is the whole of the change.
+  float uq[3],vq[3];
+  for(int j=0;j<3;++j) { uq[j]=u[j]*qv[j]; vq[j]=vtex[j]*qv[j]; }
+  p.q0=qv[0]; p.u0=uq[0]; p.v0=vq[0];
   float area=(p.x[1]-p.x[0])*(p.y[2]-p.y[0])-
              (p.x[2]-p.x[0])*(p.y[1]-p.y[0]);
   if(std::abs(area)<0.08f) return;
@@ -195,7 +199,7 @@ void Renderer::project(Vec3 a,Vec3 b,Vec3 c,const Triangle& triangle,const float
     dx=((values[1]-values[0])*(p.y[2]-p.y[0])-(values[2]-values[0])*(p.y[1]-p.y[0]))*inv;
     dy=((p.x[1]-p.x[0])*(values[2]-values[0])-(p.x[2]-p.x[0])*(values[1]-values[0]))*inv;
   };
-  gradient(u,p.dudx,p.dudy); gradient(vtex,p.dvdx,p.dvdy);
+  gradient(uq,p.dudx,p.dudy); gradient(vq,p.dvdx,p.dvdy);
   uint8_t mat=uint8_t(triangle.material&~SolidFace);
   p.material=mat==8?8:material;p.emissive=mat==7;
   p.dqdx=((qv[1]-qv[0])*(p.y[2]-p.y[0])-
@@ -232,6 +236,10 @@ void Renderer::project(Vec3 a,Vec3 b,Vec3 c,const Triangle& triangle,const float
   for(int tile=p.y0/TileRows;tile<=(p.y1-1)/TileRows;++tile)
     tileIndices[tile*MaxProjected+tileSizes[tile]++]=uint16_t(index);
 }
+// How far the rasteriser walks between perspective divides. Sixteen keeps the texture
+// error below a texel on everything this world contains, and costs one divide per
+// sixteen pixels rather than one per pixel.
+constexpr int PerspectiveSpan=16;
 void Renderer::renderRows(int y0,int y1,uint16_t* depth,std::atomic<int>* cursor) {
   int next=y0/TileRows,last=(y1+TileRows-1)/TileRows;
   for(;;) {
@@ -271,19 +279,32 @@ void Renderer::renderRows(int y0,int y1,uint16_t* depth,std::atomic<int>* cursor
         int xa=ceilToInt(clampf(left-0.5f,float(p.x0),float(p.x1)));
         int xb=ceilToInt(clampf(right-0.5f,float(p.x0),float(p.x1)));
         float q0=p.q0+p.dqdx*(xa+.5f-p.x[0])+p.dqdy*(scan-p.y[0]);
-        float u0=p.u0+p.dudx*(xa+.5f-p.x[0])+p.dudy*(scan-p.y[0]);
-        float v0=p.v0+p.dvdx*(xa+.5f-p.x[0])+p.dvdy*(scan-p.y[0]);
+        // u/z and v/z run straight across the screen; u and v do not. Dividing them back
+        // by 1/z is what keeps the seabed's texture from smearing as it is approached,
+        // which is the one place the error of interpolating u and v directly is large
+        // enough to see. One divide per PerspectiveSpan pixels holds the error under a
+        // texel without paying for a divide at every pixel.
+        float qOverZ=q0;
+        float uOverZ=p.u0+p.dudx*(xa+.5f-p.x[0])+p.dudy*(scan-p.y[0]);
+        float vOverZ=p.v0+p.dvdx*(xa+.5f-p.x[0])+p.dvdy*(scan-p.y[0]);
+        float uNow=uOverZ/(qOverZ>1?qOverZ:1),vNow=vOverZ/(qOverZ>1?qOverZ:1);
         int32_t q=int32_t(q0*256),dq=int32_t(p.dqdx*256);
-        // 12 fractional UV bits keep the expanded world's coordinates in int32 range.
-        int32_t u=int32_t(u0*4096),du=int32_t(p.dudx*4096);
-        int32_t v=int32_t(v0*4096),dv=int32_t(p.dvdx*4096);
+        // An untextured face never reads u or v, so it takes the span in one piece.
+        const int stride=texture?PerspectiveSpan:Width;
         uint16_t* z=depth+(y-top)*Width;
         uint16_t* dst=pixels+y*Width;
         // Width is a multiple of eight, so each emission row starts on a byte boundary.
         uint8_t* erow=emission_+(y*Width>>3);
         const uint8_t* lampRow=lampCone_[y>>2];
         const int rowDither=(y&1)*16;
-        for(int x=xa;x<xb;++x,q+=dq,u+=du,v+=dv) {
+        for(int xs=xa;xs<xb;xs+=stride) {
+        const int xe=std::min(xs+stride,int(xb)),run=xe-xs;
+        const float qNext=qOverZ+p.dqdx*run,qSafe=qNext>1?qNext:1;
+        const float uNext=(uOverZ+p.dudx*run)/qSafe,vNext=(vOverZ+p.dvdx*run)/qSafe;
+        // 12 fractional UV bits keep the expanded world's coordinates in int32 range.
+        int32_t u=int32_t(uNow*4096),du=int32_t((uNext-uNow)*(4096.0f/run));
+        int32_t v=int32_t(vNow*4096),dv=int32_t((vNext-vNow)*(4096.0f/run));
+        for(int x=xs;x<xe;++x,q+=dq,u+=du,v+=dv) {
           // Fixed screen-door coverage: skipped glass pixels never write depth.
           if(p.material==8 && ((x+2*y)&3)!=0)continue;
           int value=q>>8;
@@ -303,6 +324,8 @@ void Renderer::renderRows(int y0,int y1,uint16_t* depth,std::atomic<int>* cursor
             }
             dst[x]=p.palette[level][shade];
           }
+        }
+        qOverZ=qNext;uOverZ+=p.dudx*run;vOverZ+=p.dvdx*run;uNow=uNext;vNow=vNext;
         }
       }
     }
