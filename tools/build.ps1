@@ -6,7 +6,11 @@ if (!(Test-Path -LiteralPath $abyssCli)) { $abyssCli = (Get-Command arduino-cli 
 # The Windows Xtensa linker needs an ASCII output path in this environment.
 $abyssBuild = Join-Path $env:TEMP "abyssal-life-build"
 $abyssFqbn = "esp32:esp32:esp32s3:PSRAM=opi,FlashSize=16M,PartitionScheme=custom,CPUFreq=240,CDCOnBoot=default,USBMode=hwcdc"
-& $abyssCli --config-file (Join-Path $abyssProject "arduino-cli.yaml") compile --fqbn $abyssFqbn --build-path $abyssBuild --warnings all $abyssProject
+# The shipped arduino-cli.yaml carries placeholder paths; arduino-cli.local.yaml, when it
+# is there, carries this machine's and is not in the repository.
+$abyssConfig = Join-Path $abyssProject "arduino-cli.local.yaml"
+if (!(Test-Path -LiteralPath $abyssConfig)) { $abyssConfig = Join-Path $abyssProject "arduino-cli.yaml" }
+& $abyssCli --config-file $abyssConfig compile --fqbn $abyssFqbn --build-path $abyssBuild --warnings all $abyssProject
 if ($LASTEXITCODE -ne 0) { throw "Build failed ($LASTEXITCODE)" }
 if ($Upload) {
     # arduino-cli's own upload gives up part way through an image this size and leaves the
