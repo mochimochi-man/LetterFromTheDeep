@@ -26,7 +26,10 @@ void Scene::machineMesh(const MachinePose& a) {
  const bool fine=!crowded()&&d2<a.length*a.length*9;
  const bool middle=!crowded()&&d2<a.length*a.length*36;
  const Color bronze{188,135,72},dark{94,64,36},gold{233,190,118},iron{31,39,39},copper{201,125,70},glass{255,205,108};
- auto w=[&](Vec3 p){if(a.kind==MachineKind::TankFrog)p.y*=.78f;return a.position+rotateY(p,a.yaw)*a.length;};
+ // The frog lurches forward on each kick and coasts between them, so its whole mesh slides
+ // along its own axis. Set where the legs are worked out, read here.
+ float surge=0;
+ auto w=[&](Vec3 p){if(a.kind==MachineKind::TankFrog){p.y*=.78f;p.z+=surge;}return a.position+rotateY(p,a.yaw)*a.length;};
  auto tri=[&](Vec3 p,Vec3 q,Vec3 r,Color c){add(w(p),w(q),w(r),c);};
  auto solid=[&](Vec3 p,Vec3 q,Vec3 r,Color c,Vec3 origin){
   Vec3 n=unit(cross(q-p,r-p)),center=(p+q+r)*(1.f/3);if(dot(n,center-origin)<0)n=n*(-1);
@@ -191,6 +194,19 @@ void Scene::machineMesh(const MachinePose& a) {
   Vec3 tail[5]={{0,0,-.22f},{wave*.014f,.012f,-.33f},{wave*.03f,.035f,-.44f},{wave*.05f,.072f,-.55f},{wave*.06f,.10f,-.64f}};
   for(int j=0;j<4;++j){rod(tail[j],tail[j+1],.019f-j*.0037f,.015f-j*.0037f,iron);if(middle){Vec3 n=unit(tail[j+1]-tail[j]);rod(tail[j]-n*.008f,tail[j]+n*.008f,.025f-j*.004f,.025f-j*.004f,gold);}}
  } else {
+  // A frog does not swim by waving. It lies with its legs stretched out behind it and
+  // glides; it folds them up slowly, knees out to the sides; then it kicks once, hard,
+  // and glides again. A sine spends as long pushing as recovering, which is why the legs
+  // read as clockwork, so the stroke is written out as its three parts instead.
+  const float turn=a.phase*(1/(2*Pi));
+  const float c=turn-std::floor(turn);
+  float extend,spread;                      // 1 = stretched out behind, 0 = folded up
+  if(c<.22f)      { const float t=c/.22f;        extend=t*t*(3-2*t);   spread=std::sin(t*Pi); }
+  else if(c<.62f) {                              extend=1;             spread=0;              }
+  else            { const float t=(c-.62f)/.38f; extend=1-t*t*(3-2*t); spread=0;              }
+  // Quick over the kick, slow over the rest: the machine gains on its own orbit as it
+  // pushes and falls back through the glide, which is what a frog's speed does.
+  surge=.055f*(extend-.5f);
   ball({0,.005f,-.045f},{.24f,.19f,.24f},bronze);
   ball({0,.017f,.174f},{.245f,.155f,.177f},bronze);
   for(int s:{-1,1}){
@@ -198,16 +214,28 @@ void Scene::machineMesh(const MachinePose& a) {
    window({s*.166f,.139f,.24f},{s*.32f,.30f,1},.045f);
    seam({0,-.019f,.34f},{s*.178f,-.032f,.284f},{s*.25f,0,1},7);
    returnLoop({s*.227f,.047f,.008f},{s*.203f,.047f,-.15f},{float(s),0,0},.015f,.40f);
-   Vec3 hip{s*.195f,-.027f,-.11f},knee{s*(.345f+.02f*wave),-.051f,-.015f},ankle{s*.30f,-.194f,-.28f-wave*.022f};
+   // The hip is fixed and the joints below it travel between the two poses. Folded, the
+   // knee is out to the side and ahead of the hip with the heel drawn up under it;
+   // stretched, the whole leg lies back along the body.
+   const Vec3 kneeFold{s*.405f,.020f,.048f},  kneeBack{s*.250f,-.062f,-.175f};
+   const Vec3 heelFold{s*.238f,-.120f,-.040f},heelBack{s*.215f,-.150f,-.500f};
+   Vec3 hip{s*.195f,-.027f,-.11f},knee=mix(kneeFold,kneeBack,extend),ankle=mix(heelFold,heelBack,extend);
    limb(hip,knee,.066f);ball(knee,{.046f,.040f,.043f},iron);
    limb(knee,ankle,.038f);
    ring(knee+Vec3{s*.05f,0,0},{float(s),0,0},.032f,.009f,gold);
    pipe(hip+Vec3{0,.052f,0},knee+Vec3{0,.043f,0},ankle+Vec3{0,.023f,0},.009f);
    seam(hip+Vec3{0,.052f,0},knee+Vec3{0,.046f,0},{0,1,0},6);
-   Vec3 tips[4];for(int j=0;j<4;++j)tips[j]=ankle+Vec3{s*((j-1.5f)*.059f+.022f),-.025f,-.15f+(std::abs(j-1.5f))*.02f};
+   // The web opens into a paddle through the push and feathers shut the rest of the time,
+   // which is the whole point of a webbed foot and the only part of it that shows.
+   const float fan=.45f+1.15f*spread,paddle=.60f+.50f*spread;
+   Vec3 tips[4];for(int j=0;j<4;++j)tips[j]=ankle+Vec3{s*((j-1.5f)*.059f*fan+.022f),-.025f,(-.15f+(std::abs(j-1.5f))*.02f)*paddle};
    for(int j=0;j<3;++j)tri(ankle,tips[j],tips[j+1],j%2?gold:bronze);
    for(int j=0;j<4;++j)rod(ankle,tips[j],.006f,.004f,gold);
-   Vec3 shoulder{s*.194f,-.048f,.166f},elbow{s*.26f,-.154f,.115f},wrist{s*.23f,-.247f,.22f};
+   // The forelimbs do no swimming; they draw in against the hull for the glide and open
+   // again while the legs are being folded, so nothing on the machine is ever quite still.
+   Vec3 shoulder{s*.194f,-.048f,.166f};
+   Vec3 elbow=mix(Vec3{s*.292f,-.140f,.148f},Vec3{s*.238f,-.162f,.096f},extend);
+   Vec3 wrist=mix(Vec3{s*.268f,-.232f,.272f},Vec3{s*.206f,-.256f,.182f},extend);
    rod(shoulder,elbow,.030f,.024f,bronze);ball(elbow,{.027f,.024f,.027f},iron);rod(elbow,wrist,.021f,.016f,gold);ring(shoulder,{float(s),-.2f,0},.037f,.008f,gold);
    for(int j=0;j<3;++j){Vec3 tip=wrist+Vec3{s*(j-1)*.037f,-.021f,.068f};rod(wrist,tip,.005f,.003f,gold);if(j<2)tri(wrist,tip,wrist+Vec3{s*j*.037f,-.021f,.068f},bronze);}
   }

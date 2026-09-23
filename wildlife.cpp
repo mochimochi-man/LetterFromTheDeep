@@ -1271,7 +1271,22 @@ void Scene::animalMesh(const ecology::Animal& animal) {
     for(int side=-1;side<=1;++side) if(side) {
       tri({side*.074f,.012f,.245f},{side*.132f,-.048f,.055f},{side*.066f,-.020f,.155f},scale(fin,1.1f));
       tri({side*.034f,-.104f,.185f},{side*.050f,-.140f,.098f},{side*.028f,-.098f,.128f},silver);
-      panel({side*.060f,.046f,.372f},{side*.062f,.046f,.318f},{side*.062f,-.004f,.318f},{side*.060f,-.004f,.372f},{18,26,34});
+      // A bluefin's eye is round and set flush into the cheek. It was a flat square
+      // panel, which is the one thing on the animal that reads as a mistake rather than
+      // as a low-poly fish, so it is a disc like every other eye here: a pale ring with
+      // a dark pupil sitting a shade proud of it.
+      // Far off there is only the pupil, which is what an eye is at that range and costs
+      // less than the square did; the silver rim around it is close work.
+      const Vec3 eye{side*.061f,.020f,.342f};
+      const int rim=close?10:6;              // the body already owns the name `facets`
+      for(int k=0;k<rim;++k) {
+        const float a=k*2*Pi/rim,b=(k+1)*2*Pi/rim;
+        if(close) tri(eye,eye+Vec3{0,std::sin(a)*.021f,std::cos(a)*.021f},
+                          eye+Vec3{0,std::sin(b)*.021f,std::cos(b)*.021f},{124,140,152});
+        const Vec3 pupil=eye+Vec3{side*.002f,0,0};
+        tri(pupil,pupil+Vec3{0,std::sin(a)*.0158f,std::cos(a)*.0158f},
+                  pupil+Vec3{0,std::sin(b)*.0158f,std::cos(b)*.0158f},{14,20,28});
+      }
       float keel=sway(-.42f);
       tri({keel+side*.013f,-.001f,-.360f},{keel+side*.040f,-.003f,-.432f},{keel+side*.012f,-.001f,-.470f},silver);
     }
