@@ -144,7 +144,11 @@ void Scene::prehistoricMesh(const ecology::Animal& a) {
       quad(B,C,G,F,scale(plate,.84f)); quad(F,G,K,J,scale(plate,.9f));
       quad(C,D,H,G,scale(plate,.66f)); quad(G,H,L,K,scale(plate,.72f));
       tri(I,J,M,scale(plate,1.06f)); tri(J,K,M,scale(plate,.88f)); tri(K,L,M,scale(plate,.7f));
-      quad({s*.086f,.052f,.33f},{s*.086f,.012f,.34f},{s*.070f,.010f,.38f},{s*.070f,.050f,.37f},{22,30,30});
+      // Where the eye goes. This used to be a bare dark rectangle standing in for one,
+      // and leaving it behind a round eye only showed its corners. The shield falls away
+      // towards the snout at .40 across, so the disc lies at that angle and stands a few
+      // thousandths proud of it the whole way round.
+      fishEye(tri,{s*.0845f,.031f,.355f},s,.016f,.40f,close);
       tri({s*.052f,-.060f,.408f},{s*.028f,-.064f,.448f},{s*.032f,-.100f,.452f},bone);  // upper blade fang
     }
     quad({-.048f,-.050f,.40f},{.048f,-.050f,.40f},{.040f,-.070f,.462f},{-.040f,-.070f,.462f},bone);

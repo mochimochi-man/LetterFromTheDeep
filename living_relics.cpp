@@ -94,7 +94,10 @@ void Scene::livingRelicMesh(const ecology::Animal& a) {
   for(int j=0;j<4;++j)tri(end,arc[j],arc[j+1],j%2?fin:scale(fin,1.20f));
  };
  for(int side=-1;side<=1;side+=2){
-  eye({side*.081f,.057f,.408f},.023f,side);
+  // Large, as a fish that lives at four hundred metres has to be, and leaning with the
+  // blunt plated head. The nautilus keeps the eye() above: it is not a fish and its eye
+  // is a pinhole with no lens in it at all.
+  fishEye(tri,{side*.081f,.057f,.408f},float(side),.023f,.20f,detail);
   if(detail){panel({side*.113f,.085f,.261f},{side*.117f,.080f,.250f},{side*.112f,-.073f,.248f},{side*.108f,-.076f,.257f},{35,60, 70});
    panel({side*.052f,-.023f,.493f},{side*.087f,-.036f,.405f},{side*.087f,-.041f,.405f},{side*.052f,-.028f,.493f},{27, 40,51});}
   float stroke=std::sin(a.phase+side*Pi*.5f)*.035f*a.activity;

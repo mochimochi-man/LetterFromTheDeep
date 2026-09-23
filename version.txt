@@ -1,6 +1,12 @@
 Letter from The Deep
 
 
+1.1.2   2026-09-24
+
+  - Changed: the marlin, the oarfish, the Dunkleosteus and the coelacanth wear the tuna's
+    round eye, each sized to the fish.
+
+
 1.1.1   2026-09-24
 
   - Changed: the frog machine swims with a frog's kick instead of holding a pose.

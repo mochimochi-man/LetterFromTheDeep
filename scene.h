@@ -30,6 +30,38 @@ struct Landmark { Vec3 position; const char* name; };
 // ends and the wall of the hollow starts climbing, which is what closes the two ends off
 // instead of leaving empty shelves running away into the water.
 constexpr float CityBowl=260, CityTier=28, CityEdge=72, CityWall=78;
+// The eye a large fish wears.
+//
+// A dark pupil inside a thin pale ring, and both of them lying in the plane of the cheek
+// rather than square to the world. A fish's head narrows towards the snout, so the disc
+// leans: `taper` is how far its forward edge moves inward for each unit of reach across
+// it. Without that lean the eye is a patch stuck on the side of the head, which is what
+// gave the tuna a square one and what shows on anything big enough to be looked at.
+//
+// Only the big fish get this. Small ones are a few pixels across and already carry eyes
+// of their own, and the whales, the dolphins, the orca and the plesiosaur are not fish:
+// their eyes are dark and lidded and have no ring at all.
+//
+// Every mesh here has its own idea of what local space is - its own bend, its own
+// rotation, its own scale - so the caller passes in whatever it uses to emit a triangle
+// and this decides nothing but the shape.
+template<class Emit>
+void fishEye(Emit&& emit,Vec3 centre,float side,float radius,float taper,bool close) {
+  const int facets=close?12:6;
+  auto disc=[&](float r,float lift,Color colour) {
+    const Vec3 c=centre+Vec3{side*lift,0,0};
+    auto rim=[&](float angle) {
+      const float dz=std::cos(angle)*r;
+      return c+Vec3{-side*dz*taper,std::sin(angle)*r,dz};
+    };
+    for(int k=0;k<facets;++k)
+      emit(c,rim(k*2*Pi/facets),rim((k+1)*2*Pi/facets),colour);
+  };
+  // Far enough away that the ring would be one pixel, the pupil is the whole eye - which
+  // is what an eye is at that range, and cheaper than the patches these replace.
+  if(close) disc(radius,0,Color{132,146,150});
+  disc(radius*.70f,radius*.055f,Color{18,26,34});
+}
 class Scene {
  public:
   Triangle* triangles=nullptr;
