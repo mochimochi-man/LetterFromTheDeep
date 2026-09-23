@@ -40,9 +40,46 @@ void Pilot::enter(const Camera& view) {
  camera=view;velocity_={};yaw_=std::atan2(view.forward.x,view.forward.z);
  pitch_=std::asin(clampf(view.forward.y,-1,1));manual=true;
 }
+// Where the boat can get to from where it is buried.
+//
+// A saved position is a point in a world that can be rebuilt under it: the undersea city
+// has been reshaped more than once, and a spot that was open water over one terrace can
+// end up inside the next one up. Every axis is then blocked, so the boat turns on the
+// spot and goes nowhere, which looks exactly like the controls having died. Straight up
+// is the way out of a floor; a ring of directions handles being inside a wall or a tower.
+static bool Rescue(const Scene& scene,Vec3 from,float radius,Vec3& out) {
+ for(float lift=1;lift<=130;lift+=1) {
+  const Vec3 up=from+Vec3{0,lift,0};
+  if(scene.clearHull(up,radius)) { out=up; return true; }
+ }
+ for(float reach=2;reach<=48;reach+=2) for(int i=0;i<8;++i) {
+  const float a=i*Pi/4;
+  for(float lift:{0.f,6.f,-6.f}) {
+   const Vec3 aside=from+Vec3{std::sin(a)*reach,lift,std::cos(a)*reach};
+   if(scene.clearHull(aside,radius)) { out=aside; return true; }
+  }
+ }
+ return false;
+}
 void Pilot::update(const Scene& scene,const PilotInput& input,float seconds) {
  if(!manual || !std::isfinite(seconds)) return;
  float dt=clampf(seconds,0,.2f);
+ // Buried, by a world that changed shape since this position was written down. Ease out
+ // of the rock rather than sit in it; control comes back the moment the hull is clear.
+ if(!scene.clearHull(camera.position,.7f)) {
+  Vec3 open;
+  if(!Rescue(scene,camera.position,.7f,open)) {
+   // Nothing within reach is open water. Rather than leave the boat sealed in, put it
+   // back where this region begins, which is somewhere the game itself can always stand.
+   enter(scene.city?scene.cityTour(0):scene.tour(0));
+   return;
+  }
+  const Vec3 away=open-camera.position;const float far=length(away);
+  const Vec3 eye=camera.position+away*(std::min(far,8.f*dt)/std::max(.0001f,far));
+  camera.lookAt(eye,eye+camera.forward);    // the same heading, a little further out
+  velocity_={};
+  return;
+ }
  yaw_+=clampf(input.yaw,-1,1)*1.05f*dt;
  yaw_=std::remainder(yaw_,2*Pi);
  pitch_=clampf(pitch_+clampf(input.pitch,-1,1)*.75f*dt,-1.1f,1.1f);

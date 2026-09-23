@@ -16,13 +16,22 @@ const Landmark Landmarks[]={
   {{24,-12,-29},"BASALT CATHEDRAL"}
 };
 }
+// The wobble keeps the terraces from being a perfect mirror of themselves; it is part of
+// the curve, so both directions have to carry it or the buildings sit off their own row.
+float Scene::cityQ(float x,float z) { return z+x*x/CityBowl+3*std::sin(x*.025f); }
+float Scene::cityRowZ(float x,float q) { return q-x*x/CityBowl-3*std::sin(x*.025f); }
 float Scene::floor(float x,float z) const {
   if(city) {
-    float q=z-x*x/1400+4*std::sin(x*.025f),y=-238;
+    float q=cityQ(x,z),y=-238;
     for(int tier=0;tier<5;++tier) {
-      float t=clampf((q+16-tier*32)/8,0,1);
+      float t=clampf((q+16-tier*CityTier)/8,0,1);
       y+=(tier==4?24.f:18.f)*t*t*(3-2*t);
     }
+    // Past the last of the built ground the terracing stops and the rock simply climbs,
+    // which is what makes this a hollow in the cliffs rather than a flight of steps with
+    // nothing at either end of it.
+    float wall=clampf((std::abs(x)-CityEdge)/26,0,1);
+    y+=CityWall*wall*wall*(3-2*wall);
     return y+.35f*std::sin(x*.09f)*std::cos(z*.08f);
   }
   float y=world::floor(x,z);

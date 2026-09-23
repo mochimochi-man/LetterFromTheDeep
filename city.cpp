@@ -94,26 +94,42 @@ bool Scene::buildCity(Triangle* storage,uint16_t* indices) {
    if(seed%3==2) ring(base+Vec3{0,height*.48f,0},radius*1.55f,radius*.36f,light);
   }
  };
- // Uneven neighbourhoods: narrow tall towers and broad low domes share each shelf.
+ // The city, row by row up the bowl.
+ //
+ // A row stands on one terrace, which is a curve of constant q rather than a line of
+ // constant z, so the rows wrap round the arrival instead of running straight across in
+ // front of it. Each row is shorter than the one below it and carries fewer buildings,
+ // which is how a hillside town is built and is what gives the place a silhouette; four
+ // shelves of identical length were a flight of steps with houses on.
+ const float RowQ[4]={2,2+CityTier,2+2*CityTier,2+3*CityTier};
+ const float RowHalf[4]={70,58,44,28};
+ const int RowTowers[4]={8,7,5,4};
  for(int row=0;row<4;++row) {
-  for(int column=0;column<8;++column) {
+  const float half=RowHalf[row],q=RowQ[row];
+  const int wide=RowTowers[row];
+  for(int column=0;column<wide;++column) {
    uint32_t seed=420+row*31+column*7;
-   float x=(column-3.5f)*23.f+(noise(seed)-.5f)*7;
-   float z=row*32.f+2+(noise(seed+1)-.5f)*7;
+   float x=((column+.5f)/wide-.5f)*2*half+(noise(seed)-.5f)*6;
+   float z=cityRowZ(x,q+(noise(seed+1)-.5f)*6);
    float radius=3.0f+noise(seed+2)*2.5f;
    float height=9+noise(seed+3)*24;
    tower(x,z,radius,height,row*8+column,false);
   }
-  for(int column=0;column<7;++column) {
+  for(int column=0;column+1<wide;++column) {
    uint32_t seed=750+row*43+column*11;
-   float x=(column-3)*23.f+(noise(seed)-.5f)*5;
-   float z=row*32.f+12+(noise(seed+1)-.5f)*4;
+   float x=((column+1.f)/wide-.5f)*2*half+(noise(seed)-.5f)*5;
+   float z=cityRowZ(x,q+10+(noise(seed+1)-.5f)*4);
    tower(x,z,2+noise(seed+2)*2.4f,3+noise(seed+3)*7,100+row*7+column,true);
   }
-  // Broad cantilever terraces follow the lip of the cliff, with luminous fascia.
-  for(int section=0;section<12;++section) {
-   float x=-96+section*16.f,z=row*32.f-5;
-   Vec3 a{x,surface(x,z)+1.1f,z},b{x+16,surface(x+16,z)+1.1f,z};
+  // Broad cantilever terraces follow the lip of the shelf, with luminous fascia. The lip
+  // is a curve like everything else here, so each section is cut between two points on it
+  // rather than laid along a straight line that would leave the terrace behind.
+  const float edge=half+8,lip=q-7;
+  const int sections=std::max(8,int(edge/7));
+  for(int section=0;section<sections;++section) {
+   float x=-edge+section*(2*edge/sections),nx=x+2*edge/sections;
+   Vec3 a{x,surface(x,cityRowZ(x,lip))+1.1f,cityRowZ(x,lip)};
+   Vec3 b{nx,surface(nx,cityRowZ(nx,lip))+1.1f,cityRowZ(nx,lip)};
    material_=5;quad(a-Vec3{0,0,4},b-Vec3{0,0,4},b+Vec3{0,0,2},a+Vec3{0,0,2},stone);
    material_=7;quad(a-Vec3{0,.5f,4.15f},b-Vec3{0,.5f,4.15f},b-Vec3{0,0,4.15f},a-Vec3{0,0,4.15f},row%2?cyan:gold);
    material_=0;quad(a-Vec3{0,2,4},b-Vec3{0,2,4},b-Vec3{0,.5f,4},a-Vec3{0,.5f,4},dark);
@@ -121,14 +137,16 @@ bool Scene::buildCity(Triangle* storage,uint16_t* indices) {
  }
  // A clustered central landmark rises above the surrounding neighbourhoods.
  for(int i=0;i<5;++i) {
-  float a=i*2*Pi/5;
-  tower(std::cos(a)*14,61+std::sin(a)*11,3.8f+(i%2)*1.4f,30+(i%3)*9,201+i,false);
+  float a=i*2*Pi/5,x=std::cos(a)*13;
+  tower(x,cityRowZ(x,RowQ[1]+24+std::sin(a)*10),3.8f+(i%2)*1.4f,30+(i%3)*9,201+i,false);
  }
- tower(0,61,7,62,209,false);
- // Service pylons and rising light rails emphasize the vertical scale of the metropolis.
+ tower(0,cityRowZ(0,RowQ[1]+24),7,62,209,false);
+ // Service pylons and rising light rails stand against the walls of the hollow, where the
+ // terraces give out and the rock takes over, and climb with them.
  for(int side:{-1,1}) for(int row=0;row<3;++row) {
-  float x=side*98.f,z=row*32.f;
-  Vec3 a{x,surface(x,z)+4,z},b{x,surface(x,z+32)+4,z+32};
+  float x=side*(RowHalf[row]+9);
+  float za=cityRowZ(x,RowQ[row]-6),zb=cityRowZ(x,RowQ[row]+22);
+  Vec3 a{x,surface(x,za)+4,za},b{x,surface(x,zb)+4,zb};
   beam(a,b,.32f,dark);glowBeam(a+Vec3{0,.45f,0},b+Vec3{0,.45f,0},.09f,cyan);
  }
  // Return well: an open shaft framed by four illuminated pylons, with no invisible wall.
@@ -164,7 +182,9 @@ bool Scene::buildCity(Triangle* storage,uint16_t* indices) {
  // Garden beds of branching luminous polyps, not solid obstacles.
  for(int i=0;i<48;++i) {
   uint32_t seed=91003+i*37;float a=noise(seed)*Pi*2;
-  Vec3 p{-90+noise(seed)*180,0,float((i%4)*32-3)};p.y=surface(p.x,p.z)+1.3f;
+  const int bed=i%4;
+  Vec3 p{(noise(seed+5)-.5f)*2*RowHalf[bed],0,0};
+  p.z=cityRowZ(p.x,RowQ[bed]-5);p.y=surface(p.x,p.z)+1.3f;
   float h=1+noise(seed+2)*3;Color color=i%3==0?violet:cyan;
   for(int branch=0;branch<3;++branch) {
    float yaw=a+branch*2*Pi/3;
@@ -179,18 +199,32 @@ bool Scene::buildCity(Triangle* storage,uint16_t* indices) {
  return !overflow;
 }
 Camera Scene::cityTour(float time) const {
- struct Node {Vec3 p,target;};
+ // The cruise runs round the inside of the bowl: out across the floor at the front, up one
+ // wall, along the top of the terraces and down the other, looking in at the city the
+ // whole way. Every node is a place on a terrace and a height above it rather than a point
+ // in the water, so the route follows the ground plan wherever that is tuned to and can
+ // never end up inside the walls of the hollow.
+ struct Node {float x,q,above,tx,tq,tabove;};
  static const Node route[]={
-  {{-80,-207,-34},{-25,-189,28}},{{80,-202,-34},{25,-184,36}},
-  {{112,-180,4},{45,-171,48}},{{112,-149,72},{35,-153,94}},
-  {{112,-122,140},{35,-151,96}},{{-112,-122,140},{-35,-151,96}},
-  {{-112,-149,72},{-35,-163,65}},{{-112,-180,4},{-40,-185,32}}
+  {-60,-26,32,  -8, 12,14}, { 60,-26,32,   8, 12,14},
+  { 64, 16,28,  12, 46,12}, { 54, 50,28,   6, 78,10},
+  { 30, 92,26,  -4, 64,10}, {-30, 92,26,   4, 64,10},
+  {-54, 50,28,  -6, 78,10}, {-64, 16,28, -12, 46,12}
  };
+ auto place=[&](float x,float q,float above) {
+  float z=cityRowZ(x,q);return Vec3{x,floor(x,z)+above,z};
+ };
+ auto eyeOf=[&](const Node& n) {return place(n.x,n.q,n.above);};
+ auto aimOf=[&](const Node& n) {return place(n.tx,n.tq,n.tabove);};
  Vec3 p,target;float t=std::max(0.f,time);
- if(t<18) {float q=t/18;q=q*q*(3-2*q);p=mix({-12,-200,-44},route[0].p,q);target=mix({0,-195,24},route[0].target,q);}
- else {
+ if(t<18) {
+  float q=t/18;q=q*q*(3-2*q);
+  p=mix(place(-12,cityQ(-12,-44),38),eyeOf(route[0]),q);
+  target=mix(place(0,24,7),aimOf(route[0]),q);
+ } else {
   float q=std::fmod(t-18,240.f)/30;int i=int(q);q-=i;q=q*q*(3-2*q);
-  p=mix(route[i].p,route[(i+1)%8].p,q);target=mix(route[i].target,route[(i+1)%8].target,q);
+  p=mix(eyeOf(route[i]),eyeOf(route[(i+1)%8]),q);
+  target=mix(aimOf(route[i]),aimOf(route[(i+1)%8]),q);
  }
  Camera c;c.lookAt(p,target);return c;
 }

@@ -17,6 +17,19 @@ constexpr uint8_t SolidFace=0x80;
 struct Triangle { Vec3 a,b,c; Color color; uint8_t material; uint16_t shades[8]; };
 struct Chunk { Vec3 minimum,maximum; uint32_t start; uint16_t count; };
 struct Landmark { Vec3 position; const char* name; };
+// The undersea city's ground plan.
+//
+// Its terraces are curves of constant q rather than lines of constant z. q grows with the
+// distance from the middle, so a terrace bends away from the arrival where the pilot is
+// and comes forward at its ends: the place is a bowl the city sits inside, not a fan
+// spreading out of it. Because the height depends on q alone, every building on one
+// terrace stands at one height however far along it is, which is what a row of seats in
+// an arena does.
+//
+// CityTier is how far apart the terraces are, in q. CityEdge is where the built ground
+// ends and the wall of the hollow starts climbing, which is what closes the two ends off
+// instead of leaving empty shelves running away into the water.
+constexpr float CityBowl=260, CityTier=28, CityEdge=72, CityWall=78;
 class Scene {
  public:
   Triangle* triangles=nullptr;
@@ -44,6 +57,11 @@ class Scene {
   bool buildCity(Triangle* storage,uint16_t* indices);
   void sinkGate(float metres);
   world::Environment environment(Vec3 eye) const;
+  // A place in the city as its terraces see it, and the way back: where on the terrace of
+  // a given q a point of that x sits. The buildings are laid out in q and turned into
+  // places through these, so the city and the ground it stands on cannot drift apart.
+  static float cityQ(float x,float z);
+  static float cityRowZ(float x,float q);
   Camera cityTour(float time) const;
   void animateCity(float time,const Camera& camera);
   void animate(float time);
