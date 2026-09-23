@@ -1,4 +1,4 @@
-﻿#include "scene.h"
+#include "scene.h"
 #if defined(__GNUC__)
 #pragma GCC optimize("O3", "fast-math")
 #endif
@@ -44,6 +44,85 @@ void Scene::animalMesh(const ecology::Animal& animal) {
   auto panelN=[&](Vec3 a,Vec3 b,Vec3 c,Vec3 d,Color color,Vec3 axis) {
     triN(a,b,c,color,axis); triN(a,c,d,color,axis);
   };
+  if(species==Species::Viperfish) {
+    // Chauliodus sloani: Australian Museum lateral specimen / identification.
+    // A slim silver-black body, short skull, deep gape and elongated first dorsal ray.
+    // Keep the existing creature scale, flat shading and cheap distance LOD.
+    Vec3 gap=animal.position-viewer_;
+    int lod=size*size>dot(gap,gap)*.007f?0:size*size>dot(gap,gap)*.0011f?1:2;
+    if(jammed())lod=2;else if(crowded() && lod==0)lod=1;
+    const bool detail=lod==0;
+    Color back{31,43,53},silver{91,112,125},belly{134,148,151},fin{97,117,126};
+    auto sway=[&](float z){float t=clampf((.25f-z)/.8f,0,1);return std::sin(phase-t*2.1f)*t*t*.042f*activity;};
+    struct Ring{float z,w,top,bottom;};
+    static const Ring rings[]={{.345f,.034f,.055f,-.048f},{.235f,.037f,.052f,-.063f},
+      {.075f,.035f,.046f,-.064f},{-.13f,.028f,.034f,-.052f},{-.32f,.016f,.022f,-.030f},
+      {-.46f,.005f,.010f,-.010f}};
+    auto vertex=[&](int j,int k){const auto& r=rings[j];float a=k*Pi/3;
+      return Vec3{sway(r.z)+r.w*std::sin(a),std::cos(a)>=0?r.top*std::cos(a):-r.bottom*std::cos(a),r.z};};
+    const Color colors[]={back,silver,belly,belly,silver,back};
+    for(int j=0;j<5;++j)for(int k=0;k<6;++k){int n=(k+1)%6;
+      panelN(vertex(j,k),vertex(j,n),vertex(j+1,n),vertex(j+1,k),colors[k],
+             {sway((rings[j].z+rings[j+1].z)*.5f),0,(rings[j].z+rings[j+1].z)*.5f});}
+    // Skull and jaws are separate volumes: an actual gap, not teeth on a generic snout.
+    Vec3 nose{0,.029f,.492f},crown{0,.066f,.405f},chin{0,-.063f,.498f};
+    const float neckX=sway(.345f);
+    for(int side=-1;side<=1;side+=2){
+      float x=side*.035f;
+      Vec3 brow{x,.049f,.422f},upper{x*.66f,.012f,.470f},hinge{x,-.038f,.360f};
+      Vec3 cheek{x*1.04f,.005f,.382f},lower{x*.62f,-.055f,.489f};
+      Vec3 neckTop{neckX,.055f,.345f};
+      Vec3 neckUpper{neckX+side*.0294f,.0275f,.345f};
+      Vec3 neckLower{neckX+side*.0294f,-.024f,.345f};
+      Vec3 neckBottom{neckX,-.048f,.345f};
+      tri(nose,crown,brow,back);tri(nose,brow,upper,silver);
+      panel(crown,neckTop,neckUpper,brow,back);
+      panel(brow,neckUpper,neckLower,cheek,silver);
+      panel(brow,cheek,hinge,upper,scale(silver,.82f));
+      panel(cheek,neckLower,neckBottom,hinge,scale(silver,.9f));
+      panel(hinge,neckBottom,chin,lower,scale(belly,.88f));
+      tri(cheek,neckLower,hinge,scale(back,1.18f));
+      // Inset dark mouth; the long lower fangs project outside the upper jaw.
+      tri({side*.019f,.010f,.466f},{side*.019f,-.049f,.483f},{side*.019f,-.035f,.365f},{15,20,26});
+      auto tooth=[&](Vec3 root,Vec3 tip,float width){
+        Vec3 d{0,0,width};tri(root-d,root+d,tip,{209,216,203});
+        if(detail)tri(root-Vec3{width,0,0},root+Vec3{width,0,0},tip,{170,185,182});};
+      tooth(lower,{side*.019f,.056f,.465f},.004f);
+      if(lod<2)for(int j=0;j<(detail?4:2);++j){float t=float(j)/(detail?4:2);
+        float z=.455f-t*.071f,y=-.052f+t*.010f;
+        tooth({side*.024f,y,z},{side*.022f,y+.060f-t*.020f,z-.012f},.0024f);
+        tooth({side*.025f,.010f-t*.030f,z-.006f},{side*.021f,-.044f,z+.004f},.0022f);}
+      // Large round eye, restrained metallic iris, black pupil. No glowing eyeballs.
+      Vec3 eye{side*.0357f,.036f,.427f};
+      for(int k=0;k<6;++k){float a=k*Pi/3,b=(k+1)*Pi/3;
+        tri(eye,eye+Vec3{0,std::sin(a)*.015f,std::cos(a)*.015f},eye+Vec3{0,std::sin(b)*.015f,std::cos(b)*.015f},{157,166,153});
+        Vec3 pupil=eye+Vec3{side*.001f,0,.001f};
+        tri(pupil,pupil+Vec3{0,std::sin(a)*.010f,std::cos(a)*.010f},pupil+Vec3{0,std::sin(b)*.010f,std::cos(b)*.010f},{8,14,20});}
+      if(lod<2){
+        tri({neckX+side*.031f,-.011f,.326f},{neckX+side*.061f,-.052f,.253f},{neckX+side*.028f,-.035f,.294f},fin);
+        tri({side*.019f,-.060f,.035f},{side*.042f,-.102f,-.067f},{side*.021f,-.057f,-.025f},fin);
+      }
+    }
+    float tx=sway(-.46f),tip=sway(-.55f);
+    tri({tx,.01f,-.46f},{tip,.056f,-.555f},{tip,0,-.514f},fin);
+    tri({tx,-.01f,-.46f},{tip,0,-.514f},{tip,-.055f,-.555f},fin);
+    tri({sway(-.31f),-.032f,-.31f},{sway(-.34f),-.062f,-.355f},{tx,-.01f,-.455f},fin);
+    tri({sway(.28f),.052f,.28f},{sway(.26f),.124f,.26f},{sway(.17f),.050f,.17f},fin);
+    // Long first dorsal ray: a fine curving filament, never an anglerfish stalk.
+    Vec3 prev{sway(.28f),.055f,.28f};
+    for(int j=1;j<=4;++j){float t=j*.25f;Vec3 next{sway(.28f)+std::sin(phase*.3f)*.008f*t,.055f+.27f*t,.28f-.15f*t*t};
+      panel(prev+Vec3{0,0,.0015f},prev-Vec3{0,0,.0015f},next-Vec3{0,0,.001f},next+Vec3{0,0,.001f},fin);prev=next;}
+    // Small ventrolateral photophores follow the actual body surface.
+    material_=7;
+    for(int side=-1;side<=1;side+=2)for(int j=0;j<(detail?12:5);++j){
+      float z=.29f-j*(.68f/(detail?11:4));int r=0;while(r<4 && z<rings[r+1].z)++r;
+      float t=clampf((rings[r].z-z)/(rings[r].z-rings[r+1].z),0,1);
+      float w=rings[r].w*(1-t)+rings[r+1].w*t,b=rings[r].bottom*(1-t)+rings[r+1].bottom*t;
+      Vec3 p{sway(z)+side*(w*.866f+.001f),b*.5f,z};float d=detail?.0026f:.003f;
+      panel(p+Vec3{0,d,0},p+Vec3{0,0,d},p-Vec3{0,d,0},p-Vec3{0,0,d},{115,181,180});
+    }
+    material_=0;return;
+  }
   if(species==Species::CombJelly) {
     // Cydippid body plan: continuous oval, eight comb rows, two branched tentacles.
     Vec3 gap=animal.position-viewer_;
@@ -1403,14 +1482,6 @@ void Scene::animalMesh(const ecology::Animal& animal) {
     tri({side*girth*.3f,lift+.012f,-.330f},{side*girth*.3f,lift-.012f,-.330f},{side*girth*.3f,lift,-.400f},{238,240,236});
   if(species==Species::Sculpin) for(int side=-1;side<=1;side+=2)      // head spines
     tri({side*girth*.75f,lift+.020f,.280f},{side*girth*1.15f,lift+.045f,.215f},{side*girth*.80f,lift-.010f,.250f},belly);
-  if(species==Species::Viperfish) {
-    tri({-.045f,botAt(.20f),.200f},{.045f,botAt(.20f),.200f},{0,botAt(.20f)-.075f,.470f},belly);   // the hanging jaw
-    for(int k=0;k<3;++k)
-      tri({-.016f,botAt(.26f),.250f+k*.065f},{.016f,botAt(.26f),.250f+k*.065f},{0,botAt(.26f)-.048f,.275f+k*.065f},{225,224,193});
-    material_=7;                                                   // and the lure on its first ray
-    tri({0,topAt(.16f)+.080f,.150f},{0,topAt(.16f)+.080f,.185f},{0,topAt(.16f)+.110f,.168f},{168,236,214});
-    material_=0;
-  }
   }
   if(species==Species::Marlin) {
     tri({-.012f,lift,.500f},{.012f,lift,.500f},{0,lift+.004f,.860f},back);          // the bill
@@ -1423,7 +1494,7 @@ void Scene::animalMesh(const ecology::Animal& animal) {
   }
   if(species==Species::Saury)                                                        // the beak
     tri({-.008f,lift-.006f,.500f},{.008f,lift-.006f,.500f},{0,lift-.016f,.580f},back);
-  if(species==Species::Lanternfish || species==Species::Viperfish) {
+  if(species==Species::Lanternfish) {
     material_=7;
     for(int side=-1;side<=1;side+=2) for(int j=0;j<(close?4:2);++j) {
       float z=.150f-j*.085f,w=girth*fullness(z)*1.02f;
