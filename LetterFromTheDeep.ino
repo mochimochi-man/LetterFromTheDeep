@@ -700,7 +700,7 @@ void loop() {
   } else if(demoMode && canPlay()) endDemo();
   Camera camera=pilot.manual?pilot.camera:scene.tour(tourTime);
   if(!titleScreen && !demoMode && !finale.cinematic()) survey.visit(camera.position,scene.city);
-  auto event=(paused || survey.expanded || titleScreen || demoMode || introClock>=0)?Finale::Event::None:finale.update(journal.allMonumentsFound(),camera,dt,pilot.manual);
+  auto event=(paused || survey.expanded || titleScreen || demoMode || introClock>=0)?Finale::Event::None:finale.update(journal.allMonumentsFound(),scene.city,camera,dt,pilot.manual);
   if(event==Finale::Event::GateOpens) {
     // No cutscene and no teleport: the picture shakes, one line lands in the middle of
     // the screen, and the boat is left exactly where the pilot had it.

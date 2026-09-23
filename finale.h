@@ -9,7 +9,9 @@ class Finale {
   float clock=0,cooldown=0;
   Camera start;
   void restore(bool complete,bool opened);
-  Event update(bool complete,const Camera& camera,float dt,bool manual);
+  // inCity is where the boat actually is. The finale is not always what put it
+  // there, so it is told rather than left to assume.
+  Event update(bool complete,bool inCity,const Camera& camera,float dt,bool manual);
   Camera view(const Camera& normal) const;
   // Announce is not a cinematic: the pilot keeps the boat, the picture just shakes.
   bool cinematic() const {return phase==Phase::Dive;}

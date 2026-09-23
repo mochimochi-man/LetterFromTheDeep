@@ -2,10 +2,21 @@
 namespace abyss {
 constexpr float AnnounceSeconds=4.5f;
 void Finale::restore(bool complete,bool opened) {phase=complete?(opened?Phase::Open:Phase::Waiting):Phase::Locked;clock=0;cooldown=0;}
-Finale::Event Finale::update(bool complete,const Camera& c,float dt,bool manual) {
+Finale::Event Finale::update(bool complete,bool inCity,const Camera& c,float dt,bool manual) {
  if(!std::isfinite(dt)) return Event::None;
  dt=clampf(dt,0,.2f);cooldown=std::max(0.f,cooldown-dt);
  if(!complete) {phase=Phase::Locked;clock=0;return Event::None;}
+ // The pilot can be in the city, or out of it, without this having been what took them
+ // there. A save loaded inside it comes back as Open, because all restore is told is that
+ // the gate was once opened; travelling to it from the list of discoveries changes the
+ // region and says nothing to the finale at all. Left alone, the phase then reads Open
+ // while the boat is two hundred metres down inside the city - and since everything down
+ // there is below the shaft's mouth, crossing the middle of the city passes the test for
+ // being at that mouth, the descent starts over, and a quarter of a minute later the
+ // pilot is told they have arrived somewhere they already are and put back at the start
+ // of it. Where the boat is wins; the phase is corrected to match.
+ if(inCity && phase!=Phase::City && phase!=Phase::Dive) { phase=Phase::City; clock=0; }
+ else if(!inCity && phase==Phase::City) { phase=Phase::Open; clock=0; cooldown=25; }
  // Finding the last monument is the trigger, wherever the boat happens to be. The
  // gate sinks on its own and the pilot is told about it; nothing takes the controls.
  if(phase==Phase::Locked) { phase=Phase::Announce;clock=0;start=c;return Event::GateOpens; }
