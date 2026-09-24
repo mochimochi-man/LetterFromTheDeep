@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "config.h"
 #include "math3d.h"
 #include "world.h"
@@ -113,6 +113,13 @@ class Scene {
   // Catalogue pictures: stage one creature on an empty scene, nothing else in the world.
   void poseMachine(const MachinePose& pose);
   void machineMesh(const MachinePose& pose);
+  // The wreck-side display: a carrier and her boats, moored at the end of the approach.
+  // They are scenery. Nothing drives them, nothing records them, and they are posed from
+  // a MachinePose only because it is already the right shape for a place and a heading.
+  void poseAlcyone(const MachinePose& pose);
+  void alcyoneMesh(const MachinePose& pose);
+  void poseSubmarine(const MachinePose& pose);
+  void submarineMesh(const MachinePose& pose);
   void poseCreature(const ecology::Animal& animal,bool whale);
   // Running out of triangles is fatal, so the creature meshes watch how full the buffer
   // is and give up detail as it fills. A crowded reef then degrades instead of dying.

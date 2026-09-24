@@ -1,4 +1,4 @@
-﻿#if defined(ARDUINO)
+#if defined(ARDUINO)
 #include <Arduino.h>
 #endif
 #include "scene.h"
@@ -254,6 +254,58 @@ void Scene::animateCity(float time,const Camera& camera) {
  for(int i=0;i<2;++i) {
   float a=time*.022f+i*Pi;Vec3 p{std::sin(a)*70,-190+i*3.f,-36+std::cos(a)*16};
   animal(p,a+Pi*.5f,2.8f,ecology::Species::Ray,100+i);
+ }
+ // The Alcyone and her boats, at the far end of the approach.
+ //
+ // The chevrons lead out of the city and down the shaft; keep going past the shaft and
+ // the carrier is lying there with four submarines around her. It is a display and
+ // nothing else - nothing drives it, nothing records it, it is not in the catalogue and
+ // the pilot is never told it is there. Finding it is the whole of it.
+ //
+ // Between them they are heavier than the whole city, so they are built only while they
+ // are in shot, and the display is given a budget of its own which it spends nearest
+ // first. The meshes have one dial between them - how far away they are being looked
+ // from - so once the budget is gone the rest are told they are a long way off and come
+ // out coarse. Whichever one the pilot is actually looking at is the one built in full.
+ {
+  // She lies across the end of the channel rather than pointing down it, so the first
+  // thing seen from the city is her length. The boats are moored two to a side, on her
+  // heading and a little below her, the way they would be if they had just come in.
+  constexpr float Heading=.40f;
+  const Vec3 anchorage{0,-204,-280};
+  const Vec3 along{std::sin(Heading),0,std::cos(Heading)};
+  const Vec3 beam{std::cos(Heading),0,-std::sin(Heading)};
+  struct Berth { Vec3 p; float yaw,length; };
+  Berth moored[5]={{anchorage,Heading,46.f}};
+  for(int i=0;i<4;++i) {
+   const float side=(i&1)?1.f:-1.f,fore=(i&2)?-1.f:1.f;
+   moored[i+1]={anchorage+beam*(side*32)+along*(fore*18)-Vec3{0,4,0},Heading,13.f};
+  }
+  constexpr int Moored=5;
+  // How far this sea is clear, asked of the sea rather than of a constant: the Tab5 sees
+  // three times as far into the city as the board this started on.
+  const float clear=environment(camera.position).visibility;
+  const Vec3 eye=viewer_;
+  const int ceiling=staticCount+(MaxTriangles-staticCount)*2/5;
+  bool built[Moored]={};
+  for(int n=0;n<Moored;++n) {
+   int pick=-1; float nearest=0;
+   for(int i=0;i<Moored;++i) {
+    if(built[i]) continue;
+    const float d=length(moored[i].p-eye);
+    if(pick<0 || d<nearest) { pick=i; nearest=d; }
+   }
+   built[pick]=true;
+   const Berth& b=moored[pick];
+   const Vec3 p=b.p;
+   const Vec3 view=camera.view(p);
+   if(view.z<-b.length || view.z>clear) continue;
+   if(std::abs(view.x)>view.z*.9f+b.length || std::abs(view.y)>view.z*.8f+b.length) continue;
+   viewer_=count>ceiling ? p+unit(eye-p+Vec3{0,.001f,0})*(b.length*20) : eye;
+   const MachinePose pose{p,b.yaw,b.length,0,MachineKind::ArmoredFish};
+   if(b.length>20) alcyoneMesh(pose); else submarineMesh(pose);
+  }
+  viewer_=eye;
  }
  material_=0;lighting_=1;
 }
